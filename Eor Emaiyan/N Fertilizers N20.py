@@ -126,10 +126,10 @@ pprint.pprint(results)
 
 tons_per_kilo = 1/1000
 
-# Fertilizer application (t of fertilizer applied per year)
+# Fertilizer application (t/ha of fertilizer applied per year)
 urea_mass_t = 0 * tons_per_kilo * project_area_ha  # 
-npk_mass_t = 225 * tons_per_kilo * project_area_ha # ~90 t/ac from surveys
-dap_mass_t = 0 * tons_per_kilo  * project_area_ha #
+npk_mass_t = 0 * tons_per_kilo * project_area_ha # ~90 t/ac 
+dap_mass_t = 200 * tons_per_kilo  * project_area_ha #
 can_mass_t = 0 * tons_per_kilo  * project_area_ha #
 
 

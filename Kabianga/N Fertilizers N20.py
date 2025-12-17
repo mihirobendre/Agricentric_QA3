@@ -33,11 +33,10 @@ project_area_ha = actual_area * percent_cropland
 tons_per_kilo = 1/1000
 
 # Fertilizer application (t/ha of fertilizer applied per year)
-# ~400 t/ac NPK/yr ... 988 t/ha NPK/yr
-urea_mass_t = 0 * tons_per_kilo * project_area_ha  # 
-npk_mass_t = 988 * tons_per_kilo * project_area_ha # ~90 t/ac 
+urea_mass_t = 0 * tons_per_kilo * project_area_ha  #   
+npk_mass_t = 150 * tons_per_kilo * project_area_ha # ~90 t/ac 
 dap_mass_t = 0 * tons_per_kilo  * project_area_ha #
-can_mass_t = 0 * tons_per_kilo  * project_area_ha #
+can_mass_t = 125 * tons_per_kilo  * project_area_ha #i
 
 # N content
 urea_n_content = 0.46  # 46% N
@@ -128,11 +127,10 @@ pprint.pprint(results)
 tons_per_kilo = 1/1000
 
 # Fertilizer application (t/ha of fertilizer applied per year)
-# ~400 t/ac NPK/yr ... 988 t/ha NPK/yr
 urea_mass_t = 0 * tons_per_kilo * project_area_ha  # 
-npk_mass_t = 988 * tons_per_kilo * project_area_ha # ~90 t/ac 
+npk_mass_t = 150 * tons_per_kilo * project_area_ha # ~90 t/ac 
 dap_mass_t = 0 * tons_per_kilo  * project_area_ha #
-can_mass_t = 0 * tons_per_kilo  * project_area_ha #
+can_mass_t = 125 * tons_per_kilo  * project_area_ha #
 
 
 # N content
