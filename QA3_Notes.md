@@ -30,4 +30,7 @@ NPK applied 100–250 kg/ha by hand across 100% of area.
 
 # Burning
 
+Using maintenance C-input for the biomass carbon that's on farms, being added to the soil every year as residue (tC/ha). Converting to t/ha by dividing by carbon fraction.
+
+Assuming 5% area burning in baseline, 1% in project, to be conservative.
 
