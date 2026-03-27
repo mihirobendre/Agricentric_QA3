@@ -15,13 +15,6 @@
 
 
 
-# Project area (ha)
-percent_cropland = 0.7
-actual_area = 5120
-
-project_area_ha = actual_area * percent_cropland
-
-
 #####################################################################
 # BASELINE SCENARIO
 #####################################################################
@@ -34,7 +27,7 @@ tons_per_kilo = 1/1000
 
 # Fertilizer application (t/ha of fertilizer applied per year)
 urea_mass_t = 0 * tons_per_kilo * project_area_ha  # 
-npk_mass_t = 225 * tons_per_kilo * project_area_ha # ~90 t/ac 
+npk_mass_t = 195 * tons_per_kilo * project_area_ha #
 dap_mass_t = 0 * tons_per_kilo  * project_area_ha #
 can_mass_t = 0 * tons_per_kilo  * project_area_ha #
 
@@ -128,7 +121,7 @@ tons_per_kilo = 1/1000
 
 # Fertilizer application (t of fertilizer applied per year)
 urea_mass_t = 0 * tons_per_kilo * project_area_ha  # 
-npk_mass_t = 225 * tons_per_kilo * project_area_ha # ~90 t/ac from surveys
+npk_mass_t = 0 * tons_per_kilo * project_area_ha # ~90 t/ac from surveys
 dap_mass_t = 0 * tons_per_kilo  * project_area_ha #
 can_mass_t = 0 * tons_per_kilo  * project_area_ha #
 
@@ -207,6 +200,7 @@ results = {
     "Total N2O Emissions (t CO2e)": round(N2O_total_t, 4),
     "Total N2O Emissions per ha (t CO2e/ha)": round(N2O_total_per_ha, 6)
 }
+
 import pprint
 
 pprint.pprint(results)

@@ -17,7 +17,7 @@ carbon_fraction = 0.45
 MB_bsl = maintenance_c_in/carbon_fraction  # tC DM/ha --> t DM/ha
 
 # Combustion factor for agricultural residue type c (proportion of prefire fuel biomass consumed)
-CF = 0.05
+CF = 0.0
 
 # >> From IPCC 2006 GL Vol 4, Ch 2, Table 2.5 (Andreae & Merlet, 2001).
 EF_N2O = 0.00021  # kg/kg DM
@@ -42,7 +42,7 @@ carbon_fraction = 0.45
 MB_prj = maintenance_c_in/carbon_fraction  # tC DM/ha --> t DM/ha
 
 # Combustion factor for agricultural residue type c (proportion of prefire fuel biomass consumed)
-CF = 0.01
+CF = 0.0
 
 # >> From IPCC 2006 GL Vol 4, Ch 2, Table 2.5 (Andreae & Merlet, 2001).
 EF_N2O = 0.00021  # kg/kg DM

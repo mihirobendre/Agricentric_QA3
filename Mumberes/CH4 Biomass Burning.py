@@ -43,7 +43,7 @@ maintenance_c_in = 18.506
 carbon_fraction = 0.45
 
 MB = maintenance_c_in/carbon_fraction          # Mass of dry biomass burned (tons)
-CF = 0.05           # Combustion factor: percent of residues burned
+CF = 0.0           # Combustion factor: percent of residues burned
 EF = 0.0027        # Emission factor (kg CH4 / kg dry matter)
 
 emissions_CH4 = MB * CF * EF
@@ -66,7 +66,7 @@ maintenance_c_in = 18.506
 carbon_fraction = 0.45
 
 MB = maintenance_c_in/carbon_fraction          # Mass of dry biomass burned (tons)
-CF = 0.01           # Combustion factor: percent of residues burned
+CF = 0.0           # Combustion factor: percent of residues burned
 EF = 0.0027        # Emission factor (kg CH4 / kg dry matter)
 
 emissions_CH4 = MB * CF * EF
