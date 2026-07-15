@@ -361,20 +361,40 @@ def calc_fertilizer(
         notes       = fert["notes"]
 
     ef4_val = _ef4(climate)
-    N_t_ha  = application_rate_t_ha * n_frac         # t N ha⁻¹
 
-    # Direct N2O — Eq. 11.1  [t N2O ha⁻¹]
-    direct_raw = N_t_ha * ef1_val * N2O_N_TO_N2O
+    # ── VM0042 v2.2 Eq. (19): FSN = M_SF × NC_SF  [t N ha⁻¹]  (synthetic)
+    # ── VM0042 v2.2 Eq. (20): FON = M_OF × NC_OF  [t N ha⁻¹]  (organic)
+    # Here application_rate_t_ha = M (t fertilizer ha⁻¹), n_frac = NC (t N / t fertilizer)
+    FSN_t_ha = application_rate_t_ha * n_frac if is_synthetic else 0.0   # Eq. (19)
+    FON_t_ha = application_rate_t_ha * n_frac if is_organic   else 0.0   # Eq. (20)
+    N_t_ha   = FSN_t_ha + FON_t_ha                                        # total N applied
+
+    # ── VM0042 v2.2 Eq. (18): Direct N2O  [t CO2e ha⁻¹]
+    # N2O_fert_direct = (FSN + FON) × EFN_direct × (44/28) × GWP_N2O / A
+    # (A = 1 ha throughout; all quantities already on a per-ha basis)
+    direct_raw = (FSN_t_ha + FON_t_ha) * ef1_val * N2O_N_TO_N2O * GWP["N2O"]
     direct_adj = direct_raw * (1.0 - suppression)    # biochar suppression only
 
-    # Indirect N2O — volatilisation — Eq. 11.9  [t N2O ha⁻¹]
-    ind_vol    = N_t_ha * frac_gas * ef4_val * N2O_N_TO_N2O
+    # ── VM0042 v2.2 Eq. (22): Indirect N2O — volatilisation  [t CO2e ha⁻¹]
+    # N2O_fert_volat = [(FSN × FracGASF) + (FON × FracGASM)] × EFN_volat × (44/28) × GWP_N2O
+    ind_vol = (FSN_t_ha * frac_gas + FON_t_ha * frac_gas) * ef4_val * N2O_N_TO_N2O * GWP["N2O"]
 
-    # Indirect N2O — leaching — Eq. 11.10  [t N2O ha⁻¹]
-    ind_leach  = (N_t_ha * FracLEACH_H * EF5 * N2O_N_TO_N2O) if apply_leaching else 0.0
+    # ── VM0042 v2.2 Eq. (23): Indirect N2O — leaching  [t CO2e ha⁻¹]
+    # N2O_fert_leach = (FSN + FON) × FracLEACH × EFN_leach × (44/28) × GWP_N2O
+    ind_leach = ((FSN_t_ha + FON_t_ha) * FracLEACH_H * EF5 * N2O_N_TO_N2O * GWP["N2O"]
+                 if apply_leaching else 0.0)
 
-    total_n2o  = direct_adj + ind_vol + ind_leach
-    n2o_co2e   = total_n2o * GWP["N2O"]              # t CO2e ha⁻¹
+    # ── VM0042 v2.2 Eq. (21): Total indirect N2O  [t CO2e ha⁻¹]
+    # N2O_fert_indirect = (N2O_fert_volat + N2O_fert_leach) / A
+    n2o_fert_indirect = ind_vol + ind_leach                                # Eq. (21)
+
+    # ── VM0042 v2.2 Eq. (17): Total fertilizer N2O  [t CO2e ha⁻¹]
+    # N2O_fert = N2O_fert_direct + N2O_fert_indirect
+    total_n2o_co2e = direct_adj + n2o_fert_indirect                        # Eq. (17)
+
+    # Back-calculate t N2O ha⁻¹ for reporting (divide out GWP)
+    total_n2o  = total_n2o_co2e / GWP["N2O"]
+    n2o_co2e   = total_n2o_co2e                                            # t CO2e ha⁻¹
 
     # CO2 from urea/UAN hydrolysis  [t CO2 ha⁻¹]  (IPCC 2006 Ch.11.4)
     co2_t_ha   = application_rate_t_ha * co2_ef
@@ -394,17 +414,28 @@ def calc_fertilizer(
         "climate":                  climate,
         "application_rate_t_ha":    application_rate_t_ha,
         "n_fraction":               n_frac,
-        "N_applied_t_ha":           round(N_t_ha,        6),
-        "EF1_used":                 ef1_val,
-        "EF4_used":                 ef4_val,
-        "frac_gas_used":            frac_gas,
+        # N inputs [t N ha⁻¹ yr⁻¹]
+        "FSN_t_ha":                 round(FSN_t_ha,      6),   # Eq. (19)
+        "FON_t_ha":                 round(FON_t_ha,      6),   # Eq. (20)
+        "N_applied_t_ha":           round(N_t_ha,        6),   # FSN + FON
+        # IPCC EFs used
+        "EFN_direct":               ef1_val,                   # Eq. (18)
+        "EFN_volat":                ef4_val,                   # Eq. (22)
+        "EFN_leach":                EF5,                       # Eq. (23)
+        "FracGAS_used":             frac_gas,                  # Eqs. (22)
+        "FracLEACH_used":           FracLEACH_H,               # Eq. (23)
         "apply_leaching":           apply_leaching,
-        # N2O  [t ha⁻¹ yr⁻¹]
-        "direct_N2O_raw_t_ha":      round(direct_raw,    8),
-        "biochar_suppression_frac": round(suppression,   3),
-        "direct_N2O_adj_t_ha":      round(direct_adj,    8),
-        "indirect_vol_N2O_t_ha":    round(ind_vol,       8),
-        "indirect_leach_N2O_t_ha":  round(ind_leach,     8),
+        # N2O direct [t CO2e ha⁻¹ yr⁻¹] — VM0042 Eq. (18)
+        "N2O_fert_direct_raw_CO2e_t_ha":  round(direct_raw,   8),
+        "biochar_suppression_frac":        round(suppression,  3),
+        "N2O_fert_direct_CO2e_t_ha":      round(direct_adj,   8),   # Eq. (18)
+        # N2O indirect [t CO2e ha⁻¹ yr⁻¹]
+        "N2O_fert_volat_CO2e_t_ha":       round(ind_vol,      8),   # Eq. (22)
+        "N2O_fert_leach_CO2e_t_ha":       round(ind_leach,    8),   # Eq. (23)
+        "N2O_fert_indirect_CO2e_t_ha":    round(n2o_fert_indirect, 8),  # Eq. (21)
+        # VM0042 Eq. (17): total fertilizer N2O
+        "N2O_fert_CO2e_t_ha":             round(total_n2o_co2e, 6), # Eq. (17)
+        # for backward compatibility
         "total_N2O_t_ha":           round(total_n2o,     8),
         "N2O_CO2e_t_ha":            round(n2o_co2e,      6),
         # CO2 from urea hydrolysis  [t ha⁻¹ yr⁻¹]
@@ -419,21 +450,57 @@ def calc_fertilizer(
     }
 
 
+# ── VM0042 v2.2 Eq. (16) — N2O_soil aggregation ─────────────────────────────
+
+def calc_n2o_soil(
+    n2o_fert_co2e_t_ha:  float = 0.0,   # from calc_fertilizer() → Eqs. (17)–(23)
+    n2o_md_co2e_t_ha:    float = 0.0,   # N2O from manure deposition — defaulted to 0
+                                         # (outside project boundary per VM0042 Table 3)
+    n2o_nfix_co2e_t_ha:  float = 0.0,   # N2O from N-fixing species — defaulted to 0
+                                         # (outside project boundary per VM0042 Table 3)
+) -> dict:
+    """
+    VM0042 v2.2 Eq. (16):
+        N2O_soil = N2O_fert + N2O_md + N2O_Nfix   [t CO2e ha⁻¹]
+
+    Where:
+        N2O_fert  = N2O emissions due to fertilizer use        (Eqs. 17–23)
+        N2O_md    = N2O emissions due to manure deposition     (defaulted 0)
+        N2O_Nfix  = N2O from N-fixing species / crop residues  (defaulted 0)
+
+    N2O_md and N2O_Nfix are zero for this project as these emission
+    sources are outside the project boundary per VM0042 v2.2 Table 3.
+    """
+    n2o_soil = n2o_fert_co2e_t_ha + n2o_md_co2e_t_ha + n2o_nfix_co2e_t_ha  # Eq. (16)
+
+    return {
+        "N2O_fert_CO2e_t_ha":   round(n2o_fert_co2e_t_ha,  6),   # Eqs. (17)–(23)
+        "N2O_md_CO2e_t_ha":     round(n2o_md_co2e_t_ha,    6),   # Eq. (16) term — 0
+        "N2O_Nfix_CO2e_t_ha":   round(n2o_nfix_co2e_t_ha,  6),   # Eq. (16) term — 0
+        "N2O_soil_CO2e_t_ha":   round(n2o_soil,             6),   # Eq. (16) total
+    }
+
+
 # ── Scenario aggregation ─────────────────────────────────────────────────────
 
 def build_scenario(
     label: str,
     burning: dict | None,
     fertilizers: list[dict],
+    n2o_md_co2e_t_ha:  float = 0.0,   # manure deposition N2O  — Eq. (16), default 0
+    n2o_nfix_co2e_t_ha: float = 0.0,  # N-fixing species N2O   — Eq. (16), default 0
 ) -> dict:
     """
-    Aggregate burning + fertilizer components into one scenario total.
+    Aggregate burning + fertilizer components into one scenario total,
+    applying VM0042 v2.2 Eq. (16) for N2O_soil aggregation.
 
     Parameters
     ----------
-    label       : human-readable scenario name
-    burning     : result of calc_burning(), or None if no burning
-    fertilizers : list of calc_fertilizer() results (can be empty)
+    label              : human-readable scenario name
+    burning            : result of calc_burning(), or None if no burning
+    fertilizers        : list of calc_fertilizer() results (can be empty)
+    n2o_md_co2e_t_ha   : N2O from manure deposition [t CO2e ha⁻¹] — Eq. (16)
+    n2o_nfix_co2e_t_ha : N2O from N-fixing species  [t CO2e ha⁻¹] — Eq. (16)
 
     Returns
     -------
@@ -445,24 +512,30 @@ def build_scenario(
     components.extend(fertilizers)
 
     ch4_co2e_total = 0.0
-    n2o_co2e_total = 0.0
+    n2o_fert_total = 0.0
     for c in components:
         ch4_co2e_total += c.get("CH4_CO2e_t_ha", 0.0)
-        # For fertilizer: N2O_CO2e + urea_CO2e make up total (CH4 ≈ 0 for aerobic soil)
-        # For burning: total = CH4 + N2O; extract N2O portion
         if c["source"] == "burning":
-            n2o_co2e_total += c.get("N2O_CO2e_t_ha", 0.0)
+            n2o_fert_total += c.get("N2O_CO2e_t_ha", 0.0)
         else:
-            n2o_co2e_total += c.get("N2O_CO2e_t_ha", 0.0) + c.get("urea_CO2e_t_ha", 0.0)
+            n2o_fert_total += c.get("N2O_CO2e_t_ha", 0.0) + c.get("urea_CO2e_t_ha", 0.0)
 
-    grand_total = ch4_co2e_total + n2o_co2e_total
+    # VM0042 v2.2 Eq. (16): N2O_soil = N2O_fert + N2O_md + N2O_Nfix
+    n2o_soil = calc_n2o_soil(
+        n2o_fert_co2e_t_ha  = n2o_fert_total,
+        n2o_md_co2e_t_ha    = n2o_md_co2e_t_ha,
+        n2o_nfix_co2e_t_ha  = n2o_nfix_co2e_t_ha,
+    )
+    n2o_co2e_total = n2o_soil["N2O_soil_CO2e_t_ha"]
+    grand_total    = ch4_co2e_total + n2o_co2e_total
 
     return {
-        "label":            label,
-        "components":       components,
-        "CH4_CO2e_t_ha":    round(ch4_co2e_total, 6),
-        "N2O_CO2e_t_ha":    round(n2o_co2e_total, 6),
-        "total_CO2e_t_ha":  round(grand_total,    6),
+        "label":                    label,
+        "components":               components,
+        "n2o_soil":                 n2o_soil,          # Eq. (16) breakdown
+        "CH4_CO2e_t_ha":            round(ch4_co2e_total,  6),
+        "N2O_CO2e_t_ha":            round(n2o_co2e_total,  6),
+        "total_CO2e_t_ha":          round(grand_total,     6),
     }
 
 
@@ -517,16 +590,21 @@ def print_fertilizer_component(c: dict):
     print(f"  [FERTILIZER]  {c['display_name']}")
     print(f"  Application rate   : {c['application_rate_t_ha']:>12.4f}  t product ha⁻¹ yr⁻¹")
     print(f"  N fraction         : {c['n_fraction']*100:>12.2f}  %")
-    print(f"  N applied          : {c['N_applied_t_ha']:>12.6f}  t N ha⁻¹ yr⁻¹")
-    print(f"  EF1 used           : {c['EF1_used']*100:>12.3f}  %  [2019 Ref. Table 11.1]")
-    print(f"  EF4 used           : {c['EF4_used']*100:>12.3f}  %  [2019 Ref. Table 11.3]")
-    print(f"  FracGAS used       : {c['frac_gas_used']*100:>12.1f}  %  [2019 Ref. Table 7A.3]")
-    print(f"  Direct N2O (raw)   : {c['direct_N2O_raw_t_ha']:>12.8f}  t N2O ha⁻¹ yr⁻¹  [Eq.11.1]")
+    print(f"  FSN (Eq.19)        : {c['FSN_t_ha']:>12.6f}  t N ha⁻¹ yr⁻¹  [synthetic]")
+    print(f"  FON (Eq.20)        : {c['FON_t_ha']:>12.6f}  t N ha⁻¹ yr⁻¹  [organic]")
+    print(f"  N applied (FSN+FON): {c['N_applied_t_ha']:>12.6f}  t N ha⁻¹ yr⁻¹")
+    print(f"  EFN_direct (EF1)   : {c['EFN_direct']*100:>12.3f}  %  [VM0042 Eq.18 / 2019 Ref. Table 11.1]")
+    print(f"  EFN_volat  (EF4)   : {c['EFN_volat']*100:>12.3f}  %  [VM0042 Eq.22 / 2019 Ref. Table 11.3]")
+    print(f"  EFN_leach  (EF5)   : {c['EFN_leach']*100:>12.3f}  %  [VM0042 Eq.23 / 2019 Ref. Table 11.3]")
+    print(f"  FracGAS used       : {c['FracGAS_used']*100:>12.1f}  %  [2019 Ref. Table 7A.3]")
+    print(f"  EFN_direct (EF1)   : {c['EFN_direct']:>12.6f}  t N2O-N/t N  [VM0042 Eq.18]")
+    print(f"  Direct N2O (raw)   : {c['N2O_fert_direct_raw_CO2e_t_ha']:>12.8f}  t CO2e ha⁻¹ yr⁻¹  [VM0042 Eq.18]")
     if c["biochar_suppression_frac"] > 0:
         print(f"  Biochar suppress.  : {c['biochar_suppression_frac']*100:>12.1f}  %  (Cayuela et al. 2015)")
-        print(f"  Direct N2O (adj)   : {c['direct_N2O_adj_t_ha']:>12.8f}  t N2O ha⁻¹ yr⁻¹")
-    print(f"  Indirect (vol)     : {c['indirect_vol_N2O_t_ha']:>12.8f}  t N2O ha⁻¹ yr⁻¹  [Eq.11.9]")
-    print(f"  Indirect (leach)   : {c['indirect_leach_N2O_t_ha']:>12.8f}  t N2O ha⁻¹ yr⁻¹  [Eq.11.10]")
+        print(f"  Direct N2O (adj)   : {c['N2O_fert_direct_CO2e_t_ha']:>12.8f}  t CO2e ha⁻¹ yr⁻¹  [VM0042 Eq.18, biochar adj.]")
+    print(f"  Indirect (vol)     : {c['N2O_fert_volat_CO2e_t_ha']:>12.8f}  t CO2e ha⁻¹ yr⁻¹  [VM0042 Eq.22]")
+    print(f"  Indirect (leach)   : {c['N2O_fert_leach_CO2e_t_ha']:>12.8f}  t CO2e ha⁻¹ yr⁻¹  [VM0042 Eq.23]")
+    print(f"  Indirect total     : {c['N2O_fert_indirect_CO2e_t_ha']:>12.8f}  t CO2e ha⁻¹ yr⁻¹  [VM0042 Eq.21]")
     print(f"  Total N2O          : {c['total_N2O_t_ha']:>12.8f}  t N2O ha⁻¹ yr⁻¹")
     print(f"  N2O CO2e           : {c['N2O_CO2e_t_ha']:>12.6f}  t CO2e ha⁻¹ yr⁻¹  (GWP={GWP['N2O']})")
     if c["urea_CO2_t_ha"] > 0:
@@ -548,7 +626,14 @@ def print_scenario(scenario: dict):
     _sep()
     print(f"  SCENARIO TOTAL")
     print(f"  CH4 (all sources)  : {scenario['CH4_CO2e_t_ha']:>12.6f}  t CO2e ha⁻¹ yr⁻¹")
-    print(f"  N2O (all sources)  : {scenario['N2O_CO2e_t_ha']:>12.6f}  t CO2e ha⁻¹ yr⁻¹")
+    _sep()
+    print(f"  VM0042 Eq. (16): N2O_soil = N2O_fert + N2O_md + N2O_Nfix")
+    ns = scenario["n2o_soil"]
+    print(f"    N2O_fert (Eqs.17-23): {ns['N2O_fert_CO2e_t_ha']:>10.6f}  t CO2e ha⁻¹ yr⁻¹")
+    print(f"    N2O_md   (default 0): {ns['N2O_md_CO2e_t_ha']:>10.6f}  t CO2e ha⁻¹ yr⁻¹  [outside project boundary]")
+    print(f"    N2O_Nfix (default 0): {ns['N2O_Nfix_CO2e_t_ha']:>10.6f}  t CO2e ha⁻¹ yr⁻¹  [outside project boundary]")
+    print(f"    N2O_soil [Eq.16]    : {ns['N2O_soil_CO2e_t_ha']:>10.6f}  t CO2e ha⁻¹ yr⁻¹")
+    _sep()
     print(f"  GRAND TOTAL        : {scenario['total_CO2e_t_ha']:>12.6f}  t CO2e ha⁻¹ yr⁻¹")
 
 
